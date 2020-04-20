@@ -1,6 +1,24 @@
 using MacroTools
 
-function vertex_creator!(constructcall,name,params,massmatrix,states,body)
+function edge_creator!(constructcall,name,states,body)
+    rhssig = :(rhs!(e,v_s,v_d,p,t))
+    #rhssig = Meta.parse("(this::$name)(dx,x,e_s,e_d,p,t)")
+    rhsbody = quote end
+    rhsbody.args[1] = body.args[1]
+    # Prepare the parts
+    state_vars = [:($sym = x[$index]) for (index,sym) in 
+                  enumerate(states)]
+    append!(rhsbody.args, state_vars)
+    append!(rhsbody.args, body.args)
+    rhsfunc = Expr(:function, rhssig, rhsbody)
+    static_constructor = :(StaticEdge(f! = rhs!, 
+                                      dim = $(length(states)),
+                                      sym = $(states)))
+    append!(constructcall.args[2].args, [rhsfunc, static_constructor])
+    nothing
+end
+
+function vertex_creator!(constructcall,name,massmatrix,states,body)
     rhssig = :(rhs!(dx,x,e_s,e_d,p,t))
     #rhssig = Meta.parse("(this::$name)(dx,x,e_s,e_d,p,t)")
     rhsbody = quote end
@@ -15,9 +33,9 @@ function vertex_creator!(constructcall,name,params,massmatrix,states,body)
     append!(rhsbody.args, dstate_update)
     rhsfunc = Expr(:function, rhssig, rhsbody)
     ode_constructor = :(ODEVertex(f! = rhs!, 
-                                  dim = $(states.statevec),
+                                  dim = $(length(states.statevec)),
                                   mass_matrix=$massmatrix,
-                                  sym = $states.statevec))
+                                  sym = $(states.statevec)))
     append!(constructcall.args[2].args, [rhsfunc, ode_constructor])
     nothing
 end
@@ -39,6 +57,10 @@ macro Vertex(typedef,massmatrix,prep,states,body)
     #return create(typedef, massmatrix, prep, states, bodys..)
 end
 
+macro Edge(typedef,prep,states,body)
+    return create(typedef, prep, states, body)
+end
+#Verticies
 function create(typedef, massmatrix, prep, states, body)
     @capture(typedef,name_(parameters__))
     struct_expr = definestruct(name,parameters)
@@ -49,14 +71,32 @@ function create(typedef, massmatrix, prep, states, body)
     append!(constructbody.args,paramlocal)
     append!(constructbody.args,prep.args)
     constructfunction = Expr(:function, constructcall, constructbody)
-    expression = vertex_creator!(constructfunction,name, massmatrix, prep,getstatevector(states),body)
+    expression = vertex_creator!(constructfunction,name,massmatrix,getstatevector(states),body)
     ex = quote
         $(struct_expr)
         $(constructfunction)
     end
     return esc(ex)
 end
-
+# Edges
+function create(typedef, prep, states, body)
+    @capture(typedef,name_(parameters__))
+    struct_expr = definestruct(name,parameters)
+    constructcall = :(construct(vtx::$(name)))
+    #constructcall = Meta.parse("(this::$name)(dx,x,e_s,e_d,p,t)")
+    paramlocal = map(sym -> :($sym = vtx.$sym), parameters)
+    constructbody = quote end
+    append!(constructbody.args,paramlocal)
+    append!(constructbody.args,prep.args)
+    constructfunction = Expr(:function, constructcall, constructbody)
+    states = [state.args[1] for state in states.args] 
+    expression = edge_creator!(constructfunction,name,states,body)
+    ex = quote
+        $(struct_expr)
+        $(constructfunction)
+    end
+    return esc(ex)
+end
 
 #macro Vertex(typedef,massmatrix,prep,states,body)
 #    @capture(typedef, name_(parameters__))
