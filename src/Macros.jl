@@ -1,15 +1,19 @@
 using MacroTools
 
+
 function edge_creator!(constructcall,name,states,body)
     rhssig = :(rhs!(e,v_s,v_d,p,t))
     #rhssig = Meta.parse("(this::$name)(dx,x,e_s,e_d,p,t)")
     rhsbody = quote end
     rhsbody.args[1] = body.args[1]
     # Prepare the parts
-    state_vars = [:($sym = x[$index]) for (index,sym) in 
+    state_vars = [:($sym = e[$index]) for (index,sym) in 
+                  enumerate(states)]
+    state_update = [:(e[$index] = $sym) for (index,sym) in 
                   enumerate(states)]
     append!(rhsbody.args, state_vars)
     append!(rhsbody.args, body.args)
+    append!(rhsbody.args, state_update)
     rhsfunc = Expr(:function, rhssig, rhsbody)
     static_constructor = :(StaticEdge(f! = rhs!, 
                                       dim = $(length(states)),
@@ -75,6 +79,7 @@ function create(typedef, massmatrix, prep, states, body)
     ex = quote
         $(struct_expr)
         $(constructfunction)
+        nothing
     end
     return esc(ex)
 end
@@ -94,6 +99,7 @@ function create(typedef, prep, states, body)
     ex = quote
         $(struct_expr)
         $(constructfunction)
+        nothing
     end
     return esc(ex)
 end

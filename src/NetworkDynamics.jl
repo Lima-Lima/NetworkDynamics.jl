@@ -23,7 +23,9 @@ include("nd_ODE_Static.jl")
 
 include("SimpleAPI.jl")
 
-export network_dynamics
+include("Macros.jl")
+
+export network_dynamics, @Vertex, @Edge
 
 
 
