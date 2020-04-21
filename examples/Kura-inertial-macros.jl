@@ -10,17 +10,17 @@ g = barabasi_albert(N, 5)
 ω = Array{Float64}(1:N) ./ N
 
 @Edge kuraEdge(k) begin 
-    # Prep work
-end [[F]] begin
-    # Dynamics
-F = k * sin(v_s[1] - v_d[1]) #TODO:
-#F = k * sin(v_s[:ϕ] - v_d[:ϕ]) #TODO: symbolic indexing
+    @states 
+    F
+    @dynamics
+    F = k * sin(v_s[1] - v_d[1]) #TODO:
 end
 
 @Vertex kuraVertex(SetPower,D) begin
-    I # MassMatrix
-end begin
-end [[ϕ,ω],[ω,dω]] begin
+    @states
+    ϕ,ω
+    ω,dω
+    @dynamics
     dϕ = ω
     dω = SetPower - D*ω
     for e in e_s
@@ -46,6 +46,5 @@ prob_nd = ODEProblem(kur_network_nd, x0_nd, tspan, nothing)
 sol_nd = solve(prob_nd, Tsit5())
 sol_nd = solve(prob_nd, Tsit5())
 @time sol_nd = solve(prob_nd, Tsit5())
-
 
 
