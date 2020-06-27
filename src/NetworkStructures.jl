@@ -12,7 +12,6 @@ using LightGraphs
 using LinearAlgebra
 using SparseArrays
 
-
 # We need rather complicated sets of indices into the arrays that hold the
 # vertex and the edge variables. We precompute everything we can and store it
 # in GraphStruct.
@@ -82,6 +81,8 @@ struct GraphStruct
     d_e_idx::Array{Idx, 1}
     e_s_v_dat::Array{Array{Tuple{Int,Int}, 1}}
     e_d_v_dat::Array{Array{Tuple{Int,Int}, 1}}
+    expr_s_v_dat::Array{Array{Int}, 1}
+    expr_d_v_dat::Array{Array{Int}, 1}
 end
 function GraphStruct(g, v_dims, e_dims, v_syms, e_syms)
     num_v = nv(g)
@@ -102,8 +103,35 @@ function GraphStruct(g, v_dims, e_dims, v_syms, e_syms)
     s_e_idx = [v_idx[s_e[i_e]] for i_e in 1:num_e]
     d_e_idx = [v_idx[d_e[i_e]] for i_e in 1:num_e]
 
-    e_s_v_dat = [[(offset, dim) for (i_e, (offset, dim)) in enumerate(zip(e_offs, e_dims)) if i_v == s_e[i_e]] for i_v in 1:num_v]
-    e_d_v_dat = [[(offset, dim) for (i_e, (offset, dim)) in enumerate(zip(e_offs, e_dims)) if i_v == d_e[i_e]] for i_v in 1:num_v]
+    e_s_v_dat = [[(offset, dim) 
+                  for 
+                    (i_e, (offset, dim)) 
+                    in enumerate(zip(e_offs, e_dims)) 
+                  if 
+                    i_v == s_e[i_e]] 
+                            for i_v in 1:num_v]
+    e_d_v_dat = [[(offset, dim) 
+                  for 
+                    (i_e, (offset, dim)) 
+                    in enumerate(zip(e_offs, e_dims)) 
+                    if 
+                        i_v == d_e[i_e]] 
+                            for i_v in 1:num_v]
+    expr_s_v_dat = [[i_e
+                  for 
+                    i_e 
+                    in 1:num_e 
+                  if 
+                    i_v == s_e[i_e]] 
+                            for i_v in 1:num_v]
+    
+    expr_d_v_dat = [[i_e
+                  for 
+                    i_e 
+                    in 1:num_e 
+                  if 
+                    i_v == d_e[i_e]] 
+                            for i_v in 1:num_v]
 
     GraphStruct(
     num_v,
@@ -125,7 +153,9 @@ function GraphStruct(g, v_dims, e_dims, v_syms, e_syms)
     s_e_idx,
     d_e_idx,
     e_s_v_dat,
-    e_d_v_dat)
+    e_d_v_dat,
+    expr_s_v_dat,
+    expr_d_v_dat)
 end
 
 # In order to access the data in the arrays efficiently we create views that
@@ -167,6 +197,7 @@ end
     e_dat.gd.e_array[idx + e_dat.idx_offset]
 end
 
+
 @inline Base.@propagate_inbounds function setindex!(e_dat::EdgeData, x, idx)
     e_dat.gd.e_array[idx + e_dat.idx_offset] = x
     nothing
@@ -176,9 +207,11 @@ end
     e_dat.len
 end
 
+
 @inline function Base.size(e_dat::EdgeData)
     (e_dat.len, )
 end
+
 
 @inline function Base.eltype(e_dat::EdgeData{G, T}) where {G, T}
     eltype(T)
@@ -232,20 +265,36 @@ Base.IndexStyle(::Type{<:VertexData}) = IndexLinear()
 mutable struct GraphData{Tv, Te}
     v_array::Tv
     e_array::Te
+    expr_array
     v::Array{VertexData{GraphData{Tv, Te}, Tv}, 1}
     e::Array{EdgeData{GraphData{Tv, Te}, Te}, 1}
     v_s_e::Array{VertexData{GraphData{Tv, Te}, Tv}, 1} # the vertex that is the source of e
     v_d_e::Array{VertexData{GraphData{Tv, Te}, Tv}, 1} # the vertex that is the destination of e
     e_s_v::Array{Array{EdgeData{GraphData{Tv, Te}, Te}, 1}, 1} # the edges that have v as source
     e_d_v::Array{Array{EdgeData{GraphData{Tv, Te}, Te}, 1}, 1} # the edges that have v as destination
-    function GraphData{Tv, Te}(v_array::Tv, e_array::Te, gs::GraphStruct) where {Tv, Te}
+    expr_s_v::Array{Array{SubArray{Float64,0,Array{Float64,1},Tuple{Int64},true}, 1}, 1} # the edges that have v as source
+    expr_d_v::Array{Array{SubArray{Float64,0,Array{Float64,1},Tuple{Int64},true}, 1}, 1} # the edges that have v as destination
+    function GraphData{Tv, Te}(v_array::Tv, e_array::Te, expr_array, gs::GraphStruct) where {Tv, Te}
         gd = new{Tv, Te}(v_array, e_array, )
-        gd.v = [VertexData{GraphData{Tv, Te}, Tv}(gd, offset, dim) for (offset,dim) in zip(gs.v_offs, gs.v_dims)]
-        gd.e = [EdgeData{GraphData{Tv, Te}, Te}(gd, offset, dim) for (offset,dim) in zip(gs.e_offs, gs.e_dims)]
-        gd.v_s_e = [VertexData{GraphData{Tv, Te}, Tv}(gd, offset, dim) for (offset,dim) in zip(gs.s_e_offs, gs.v_dims[gs.s_e])]
-        gd.v_d_e = [VertexData{GraphData{Tv, Te}, Tv}(gd, offset, dim) for (offset,dim) in zip(gs.d_e_offs, gs.v_dims[gs.d_e])]
-        gd.e_s_v = [[EdgeData{GraphData{Tv, Te}, Te}(gd, offset, dim) for (offset,dim) in e_s_v] for e_s_v in gs.e_s_v_dat]
-        gd.e_d_v = [[EdgeData{GraphData{Tv, Te}, Te}(gd, offset, dim) for (offset,dim) in e_d_v] for e_d_v in gs.e_d_v_dat]
+        gd.expr_array = expr_array
+        gd.v = [VertexData{GraphData{Tv, Te}, Tv}(gd, offset, dim) for 
+                (offset,dim) in zip(gs.v_offs, gs.v_dims)]
+        gd.e = [EdgeData{GraphData{Tv, Te}, Te}(gd, offset, dim) for 
+                (offset,dim) in zip(gs.e_offs, gs.e_dims)]
+        gd.v_s_e = [VertexData{GraphData{Tv, Te}, Tv}(gd, offset, dim) for
+                    (offset,dim) in zip(gs.s_e_offs, gs.v_dims[gs.s_e])]
+        gd.v_s_e = [VertexData{GraphData{Tv, Te}, Tv}(gd, offset, dim) for
+                    (offset,dim) in zip(gs.s_e_offs, gs.v_dims[gs.s_e])]
+        gd.v_d_e = [VertexData{GraphData{Tv, Te}, Tv}(gd, offset, dim) for
+                    (offset,dim) in zip(gs.d_e_offs, gs.v_dims[gs.d_e])]
+        gd.e_s_v = [[EdgeData{GraphData{Tv, Te}, Te}(gd, offset, dim) for
+                     (offset,dim) in e_s_v] for e_s_v in gs.e_s_v_dat]
+        gd.e_d_v = [[EdgeData{GraphData{Tv, Te}, Te}(gd, offset, dim) for 
+                     (offset,dim) in e_d_v] for e_d_v in gs.e_d_v_dat]
+        gd.expr_s_v = [[view(gd.expr_array,i) for i in expr_s_v] for 
+                                         expr_s_v in gs.expr_s_v_dat]
+        gd.expr_d_v = [[view(gd.expr_array,i) for i in expr_d_v] for 
+                                         expr_d_v in gs.expr_d_v_dat]
         gd
     end
 end
@@ -253,6 +302,11 @@ end
 function GraphData(v_array, e_array, gs)
     GraphData{typeof(v_array), typeof(e_array)}(v_array, e_array, gs)
 end
+
+function GraphData(v_array, e_array, expr_array, gs)
+    GraphData{typeof(v_array), typeof(e_array)}(v_array, e_array, expr_array, gs)
+end
+
 
 #= In order to manipulate initial conditions using this view of the underlying
 array we provide view functions that give access to the arrays. =#

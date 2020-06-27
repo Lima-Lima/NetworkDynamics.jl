@@ -99,7 +99,7 @@ function network_dynamics(vertices!::Union{Array{T, 1}, T}, edges!::Union{Array{
 
     graph_stucture = GraphStruct(graph, v_dims, e_dims, symbols_v, symbols_e)
 
-    graph_data = GraphData(v_array, e_array, graph_stucture)
+    graph_data = GraphData(v_array, e_array,  graph_stucture)
 
     nd! = nd_ODE_Static(vertices!, edges!, graph, graph_stucture, graph_data, parallel)
     mass_matrix = construct_mass_matrix(mmv_array, graph_stucture)
@@ -179,12 +179,13 @@ function network_dynamics(vertices!::Union{Array{T, 1}, T}, edges!::Union{Array{
     x_array = similar(x_prototype, sum(v_dims) + sum(e_dims))
     v_array = view(x_array, 1:sum(v_dims))
     e_array = view(x_array, sum(v_dims)+1:sum(v_dims)+sum(e_dims))
+    expr_array = similar(x_prototype, ne(graph))
 
     symbols = vcat(symbols_v, symbols_e)
 
     graph_stucture = GraphStruct(graph, v_dims, e_dims, symbols_v, symbols_e)
 
-    graph_data = GraphData(v_array, e_array, graph_stucture)
+    graph_data = GraphData(v_array, e_array, expr_array, graph_stucture)
 
     nd! = nd_ODE_ODE(vertices!, edges!, graph, graph_stucture, graph_data, parallel)
 
