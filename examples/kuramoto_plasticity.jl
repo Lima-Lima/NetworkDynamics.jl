@@ -1,10 +1,10 @@
 using LightGraphs
 using OrdinaryDiffEq
 using NetworkDynamics
-using Plots, LaTeXStrings
+#using Plots, LaTeXStrings
 
-N = 100 # number of nodes
-k = 10  # average degree
+N = 16 # number of nodes
+k = 3  # average degree
 g = barabasi_albert(N, k)
 
 #=
@@ -14,20 +14,24 @@ g = barabasi_albert(N, k)
 =#
 
 
-@inline function kuramoto_plastic_edge!(de, e, v_s, v_d, p, t)
+@inline function kuramoto_plastic_edge!(de, e, ex, v_s, v_d, p, t)
     # Source to Destination coupling
+
+    ϵ = 0.1
+    α = .2π
+    β = -.95π
 
     # The coupling function is modeled by a differential algebraic equation with mass matrix 0
     # 0 * de[1] = e[2] * sin(v_s[1] - v_d[1] + α) / N - e[1] is equivalent to e[1] = e[2] * sin(v_s[1] - v_d[1] + α) / N
 
-    de[1] =  e[2] * sin(v_s[1] - v_d[1] + α) / N - e[1]
-    de[2] = - ϵ * (sin(v_s[1] - v_d[1] + β) + e[2])
+    ex[1] =  e[1] * sin(v_s[1] - v_d[1] + α) / N  # Not updating the dynamic state vector
+    de[1] = - ϵ * (sin(v_s[1] - v_d[1] + β) + e[1]) # Updating the dynamics state vector
 
     # Destination to source coupling
     # since the coupling function is not symmetric we have to compute the other direction as well
 
-    de[3] =  e[4] * sin(v_d[1] - v_s[1] + α) / N - e[3]
-    de[4] = - ϵ * (sin(v_d[1] - v_s[1] + β) + e[4])
+    ex[2] =  e[2] * sin(v_d[1] - v_s[1] + α) / N
+    de[2] = - ϵ * (sin(v_d[1] - v_s[1] + β) + e[2])
     nothing
 end
 
@@ -37,27 +41,20 @@ end
         dv .-= e[1]
     end
     for e in e_d # other direction is stored at other index
-        dv .-= e[3]
+        dv .-= e[2]
     end
 end
 
-
+function run()
     # Parameter definitions
-ϵ = 0.1
-α = .2π
-β = -.95π
-
 # NetworkDynamics Setup
 plasticvertex = ODEVertex(f! = kuramoto_plastic_vertex!, dim =1)
-mass_matrix_plasticedge = zeros(4,4)
-mass_matrix_plasticedge[2,2] = 1. # 1st and 3rd internal varibale are set to 0
-mass_matrix_plasticedge[4,4] = 1.
 
-plasticedge = ODEEdge(f! = kuramoto_plastic_edge!, dim=4, sym=[:es, :ks,:ed,:kd], mass_matrix = mass_matrix_plasticedge);
+plasticedge = ODEEdge(f! = kuramoto_plastic_edge!, dim=2, expr_dim=2, sym=[:ks,:kd], expr_sym=[:es,:ed])
 kuramoto_plastic! = network_dynamics(plasticvertex, plasticedge, g)
 
 # ODE Setup & Solution
-x0_plastic        = vcat(randn(N), ones(4ne(g)))
+x0_plastic        = vcat(randn(N), ones(2ne(g)))
 tspan_plastic     = (0., 200.)
 params_plastic    = (nothing, nothing)
 prob_plastic      = ODEProblem(kuramoto_plastic!, x0_plastic, tspan_plastic, params_plastic)
@@ -66,8 +63,11 @@ sol_plastic       = solve(prob_plastic, Rosenbrock23(), abstol = 1e-3, reltol = 
 # Plotting
 v_idx = idx_containing(kuramoto_plastic!, :v)
 
-plot(sol_plastic, vars=v_idx, legend=false, ylabel=L"\theta")
+#plot(sol_plastic, vars=v_idx, legend=false, ylabel=L"\theta")
 
 # Shows Coupling terms
 e_idx = idx_containing(kuramoto_plastic!, :k)
-# plot!(sol_plastic, vars=e_idx, legend=false, color=:black, linewidth=0.001)
+
+return sol_plastic
+#plot!(sol_plastic, vars=e_idx, legend=false, color=:black, linewidth=0.001)
+end

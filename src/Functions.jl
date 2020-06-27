@@ -83,7 +83,9 @@ For more details see the documentation.
 @Base.kwdef struct StaticEdge{T} <: EdgeFunction
     f!::T # (e, v_s, v_t, p, t) -> nothing
     dim::Int # number of dimensions of x
+    expr_dim::Int # number of dimensions of x
     sym=[:e for i in 1:dim] # Symbols for the dimensions
+    expr_sym=[:ex for i in 1:dim] # Symbols for the dimensions
 end
 
 """
@@ -147,8 +149,10 @@ For more details see the documentation.
 @Base.kwdef struct ODEEdge{T} <: EdgeFunction
     f!::T # The function with signature (dx, x, e_s, e_t, p, t) -> nothing
     dim::Int # number of dimensions of x
+    expr_dim::Int # number of non-dynamic dimensions of x
     mass_matrix=I # Mass matrix for the equation
     sym=[:e for i in 1:dim] # Symbols for the dimensions
+    expr_sym=[:ex for i in 1:dim] # Symbols for the dimensions
 end
 
 
