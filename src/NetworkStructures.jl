@@ -16,14 +16,14 @@ using SparseArrays
 # vertex and the edge variables. We precompute everything we can and store it
 # in GraphStruct.
 
-export create_idxs, create_offsets, GraphStruct, GraphData, EdgeData, VertexData, construct_mass_matrix
+export created_idxs, create_offsets, GraphStruct, GraphData, EdgeData, VertexData, construct_mass_matrix
 
 const Idx = UnitRange{Int}
 
 """
 Create indices for stacked array of dimensions dims
 """
-function create_idxs(dims; counter=1)::Array{Idx, 1}
+function created_idxs(dims; counter=1)::Array{Idx, 1}
     idxs = [1:1 for dim in dims]
     for (i, dim) in enumerate(dims)
         idxs[i] = counter:(counter + dim - 1)
@@ -47,7 +47,7 @@ end
 """
 Create indexes for stacked array of dimensions dims using the offsets offs
 """
-function create_idxs(offs, dims)::Array{Idx, 1}
+function created_idxs(offs, dims)::Array{Idx, 1}
     idxs = [1+off:off+dim for (off, dim) in zip(offs, dims)]
 end
 
@@ -64,106 +64,33 @@ struct GraphStruct
     num_v::Int
     num_e::Int
     v_dims::Array{Int, 1} # Array of dimension of each vertex
-    e_dims::Array{Int, 1} # and edge differetinal state
-    expr_dims::Array{Int, 1} # and edge expression
+    ed_dims::Array{Int, 1} # and edge differetinal state
+    eS_dims::Array{Int, 1} # and edge eSession
     v_syms::Array{Symbol, 1} # Symbols associated with v states
-    e_syms::Array{Symbol, 1} # e states
-    expr_syms::Array{Symbol, 1} # and expression terms
+    ed_syms::Array{Symbol, 1} # e states
+    eS_syms::Array{Symbol, 1} # and eSession terms
     dim_v::Int            # Total state dimension of v (=sum(v_dims))
-    dim_e::Int            # State dimension of edges
-    dim_expr::Int
+    dim_ed::Int            # State dimension of edges
+    dim_edS::Int
     s_e::Array{Int, 1}
     d_e::Array{Int, 1}
     v_offs::Array{Int, 1}
-    e_offs::Array{Int, 1}
-    expr_offs::Array{Int, 1}
+    ed_offs::Array{Int, 1}
+    eS_offs::Array{Int, 1}
     v_idx::Array{Idx, 1}
-    e_idx::Array{Idx, 1}
-    expr_idx::Array{Idx, 1}
-    s_e_offs::Array{Int, 1}
-    d_e_offs::Array{Int, 1}
-    s_e_idx::Array{Idx, 1}
-    d_e_idx::Array{Idx, 1}
-    e_s_v_dat::Array{Array{Tuple{Int,Int}, 1}}
-    e_d_v_dat::Array{Array{Tuple{Int,Int}, 1}}
-    expr_s_v_dat::Array{Array{Tuple{Int,Int}, 1}}
-    expr_d_v_dat::Array{Array{Tuple{Int,Int}, 1}}
+    ed_idx::Array{Idx, 1}
+    eS_idx::Array{Idx, 1}
+    s_ed_offs::Array{Int, 1}
+    d_ed_offs::Array{Int, 1}
+    s_ed_idx::Array{Idx, 1}
+    d_ed_idx::Array{Idx, 1}
+    ed_s_v_dat::Array{Array{Tuple{Int,Int}, 1}}
+    ed_d_v_dat::Array{Array{Tuple{Int,Int}, 1}}
+    eS_s_v_dat::Array{Array{Tuple{Int,Int}, 1}}
+    eS_d_v_dat::Array{Array{Tuple{Int,Int}, 1}}
 end
-#function GraphStruct(g, v_dims, e_dims, v_syms, e_syms)
-#    num_v = nv(g)
-#    num_e = ne(g)
-#
-#    s_e = [src(e) for e in edges(g)]
-#    d_e = [dst(e) for e in edges(g)]
-#
-#    v_offs = create_offsets(v_dims)
-#    e_offs = create_offsets(e_dims)
-#    expr_offs = create_offsets(expr_dims)
-#
-#    v_idx = create_idxs(v_offs, v_dims)
-#    e_idx = create_idxs(e_offs, e_dims)
-#
-#    s_e_offs = [v_offs[s_e[i_e]] for i_e in 1:num_e]
-#    d_e_offs = [v_offs[d_e[i_e]] for i_e in 1:num_e]
-#
-#    s_e_idx = [v_idx[s_e[i_e]] for i_e in 1:num_e]
-#    d_e_idx = [v_idx[d_e[i_e]] for i_e in 1:num_e]
-#
-#    e_s_v_dat = [[(offset, dim) 
-#                  for 
-#                    (i_e, (offset, dim)) 
-#                    in enumerate(zip(e_offs, e_dims)) 
-#                  if 
-#                    i_v == s_e[i_e]] 
-#                            for i_v in 1:num_v]
-#    e_d_v_dat = [[(offset, dim) 
-#                  for 
-#                    (i_e, (offset, dim)) 
-#                    in enumerate(zip(e_offs, e_dims)) 
-#                    if 
-#                        i_v == d_e[i_e]] 
-#                            for i_v in 1:num_v]
-#    expr_s_v_dat = [[i_e
-#                  for 
-#                    i_e 
-#                    in 1:num_e 
-#                  if 
-#                    i_v == s_e[i_e]] 
-#                            for i_v in 1:num_v]
-#    
-#    expr_d_v_dat = [[i_e
-#                  for 
-#                    i_e 
-#                    in 1:num_e 
-#                  if 
-#                    i_v == d_e[i_e]] 
-#                            for i_v in 1:num_v]
-#
-#    GraphStruct(
-#    num_v,
-#    num_e,
-#    v_dims,
-#    e_dims,
-#    v_syms,
-#    e_syms,
-#    sum(v_dims),
-#    sum(e_dims),
-#    s_e,
-#    d_e,
-#    v_offs,
-#    e_offs,
-#    v_idx,
-#    e_idx,
-#    s_e_offs,
-#    d_e_offs,
-#    s_e_idx,
-#    d_e_idx,
-#    e_s_v_dat,
-#    e_d_v_dat,
-#    expr_s_v_dat,
-#    expr_d_v_dat)
-#end
-function GraphStruct(g, v_dims, e_dims, expr_dims, v_syms, e_syms, expr_syms)
+
+function GraphStruct(g, v_dims, ed_dims, eS_dims, v_syms, ed_syms, eS_syms)
     num_v = nv(g)
     num_e = ne(g)
 
@@ -171,49 +98,49 @@ function GraphStruct(g, v_dims, e_dims, expr_dims, v_syms, e_syms, expr_syms)
     d_e = [dst(e) for e in edges(g)]
 
     v_offs = create_offsets(v_dims)
-    e_offs = create_offsets(e_dims)
-    expr_offs = create_offsets(expr_dims)
+    ed_offs = create_offsets(ed_dims)
+    eS_offs = create_offsets(eS_dims)
 
-    v_idx = create_idxs(v_offs, v_dims)
-    e_idx = create_idxs(e_offs, e_dims)
-    expr_idx = create_idxs(expr_offs, expr_dims)
+    v_idx = created_idxs(v_offs, v_dims)
+    ed_idx = created_idxs(ed_offs, ed_dims)
+    eS_idx = created_idxs(eS_offs, eS_dims)
 
-    s_e_offs = [v_offs[s_e[i_e]] for i_e in 1:num_e]
-    d_e_offs = [v_offs[d_e[i_e]] for i_e in 1:num_e]
+    s_ed_offs = [v_offs[s_e[i_e]] for i_e in 1:num_e]
+    d_ed_offs = [v_offs[d_e[i_e]] for i_e in 1:num_e]
     
-    s_e_idx = [v_idx[s_e[i_e]] for i_e in 1:num_e]
-    d_e_idx = [v_idx[d_e[i_e]] for i_e in 1:num_e]
+    s_ed_idx = [v_idx[s_e[i_e]] for i_e in 1:num_e]
+    d_ed_idx = [v_idx[d_e[i_e]] for i_e in 1:num_e]
 
-    e_s_v_dat = [[(offset, dim) 
+    ed_s_v_dat = [[(offset, dim) 
                   for 
                     (i_e, (offset, dim)) 
-                    in enumerate(zip(e_offs, e_dims)) 
+                    in enumerate(zip(ed_offs, ed_dims)) 
                   if 
                     i_v == s_e[i_e]] 
                             for i_v in 1:num_v]
-    e_d_v_dat = [[(offset, dim) 
+    ed_d_v_dat = [[(offset, dim) 
                   for 
                     (i_e, (offset, dim)) 
-                    in enumerate(zip(e_offs, e_dims)) 
+                    in enumerate(zip(ed_offs, ed_dims)) 
                     if 
                         i_v == d_e[i_e]] 
                             for i_v in 1:num_v]
     
-    expr_s_v_dat = [[(offset, dim) 
+    eS_s_v_dat = [[(offset, dim) 
                   for 
                     (i_e, (offset, dim)) 
-                    in enumerate(zip(expr_offs, expr_dims)) 
+                    in enumerate(zip(eS_offs, eS_dims)) 
                   if 
                     i_v == s_e[i_e]] 
                             for i_v in 1:num_v]
-    expr_d_v_dat = [[(offset, dim) 
+    eS_d_v_dat = [[(offset, dim) 
                   for 
                     (i_e, (offset, dim)) 
-                    in enumerate(zip(expr_offs, expr_dims)) 
+                    in enumerate(zip(eS_offs, eS_dims)) 
                     if 
                         i_v == d_e[i_e]] 
                             for i_v in 1:num_v]
-   # expr_s_v_dat = [[i_e
+   # eS_s_v_dat = [[i_e
    #               for 
    #                 i_e 
    #                 in 1:num_e 
@@ -221,7 +148,7 @@ function GraphStruct(g, v_dims, e_dims, expr_dims, v_syms, e_syms, expr_syms)
    #                 i_v == s_e[i_e]] 
    #                         for i_v in 1:num_v]
    # 
-   # expr_d_v_dat = [[i_e
+   # eS_d_v_dat = [[i_e
    #               for 
    #                 i_e 
    #                 in 1:num_e 
@@ -233,30 +160,30 @@ function GraphStruct(g, v_dims, e_dims, expr_dims, v_syms, e_syms, expr_syms)
     num_v,
     num_e,
     v_dims,
-    e_dims,
-    expr_dims,
+    ed_dims,
+    eS_dims,
     v_syms,
-    e_syms,
-    expr_syms,
+    ed_syms,
+    eS_syms,
     sum(v_dims),
-    sum(e_dims),
-    sum(expr_dims),
+    sum(ed_dims),
+    sum(eS_dims),
     s_e,
     d_e,
     v_offs,
-    e_offs,
-    expr_offs,
+    ed_offs,
+    eS_offs,
     v_idx,
-    e_idx,
-    expr_idx,
-    s_e_offs,
-    d_e_offs,
-    s_e_idx,
-    d_e_idx,
-    e_s_v_dat,
-    e_d_v_dat,
-    expr_s_v_dat,
-    expr_d_v_dat)
+    ed_idx,
+    eS_idx,
+    s_ed_offs,
+    d_ed_offs,
+    s_ed_idx,
+    d_ed_idx,
+    ed_s_v_dat,
+    ed_d_v_dat,
+    eS_s_v_dat,
+    eS_d_v_dat)
 end
 
 # In order to access the data in the arrays efficiently we create views that
@@ -276,7 +203,7 @@ struct EdgeData{T} <: AbstractArray{T, 1}
  len::Int
 end
 
-Then the recursive type signatures in GraphData that look like:
+Then the recursive type eSnatures in GraphData that look like:
 
 EdgeData{GraphData{T}, T}
 
@@ -294,35 +221,35 @@ struct EdgeData{G,T} <: AbstractArray{T, 1} # This is a lie. The elements of Edg
     len::Int
 end
 
-struct EdgeExprData{G,T} <: AbstractArray{T, 1} # This is a lie. The elements of EdgeData are not of type T but of type eltype(T).
+struct EdgeStaticData{G,T} <: AbstractArray{T, 1} # This is a lie. The elements of EdgeData are not of type T but of type eltype(T).
     gd::G
     idx_offset::Int
     len::Int
 end
 
 @inline Base.@propagate_inbounds function getindex(e_dat::EdgeData, idx)
-    e_dat.gd.e_array[idx + e_dat.idx_offset]
+    e_dat.gd.ed_array[idx + e_dat.idx_offset]
 end
 
-@inline Base.@propagate_inbounds function getindex(ex_dat::EdgeExprData, idx)
-    ex_dat.gd.expr_array[idx + ex_dat.idx_offset]
+@inline Base.@propagate_inbounds function getindex(ex_dat::EdgeStaticData, idx)
+    ex_dat.gd.eS_array[idx + ex_dat.idx_offset]
 end
 
 
 @inline Base.@propagate_inbounds function setindex!(e_dat::EdgeData, x, idx)
-    e_dat.gd.e_array[idx + e_dat.idx_offset] = x
+    e_dat.gd.ed_array[idx + e_dat.idx_offset] = x
     nothing
 end
 
-@inline Base.@propagate_inbounds function setindex!(ex_dat::EdgeExprData, x, idx)
-    ex_dat.gd.expr_array[idx + ex_dat.idx_offset] = x
+@inline Base.@propagate_inbounds function setindex!(ex_dat::EdgeStaticData, x, idx)
+    ex_dat.gd.eS_array[idx + ex_dat.idx_offset] = x
     nothing
 end
 
 @inline function Base.length(e_dat::EdgeData)
     e_dat.len
 end
-@inline function Base.length(e_dat::EdgeExprData)
+@inline function Base.length(e_dat::EdgeStaticData)
     e_dat.len
 end
 
@@ -330,7 +257,7 @@ end
 @inline function Base.size(e_dat::EdgeData)
     (e_dat.len, )
 end
-@inline function Base.size(e_dat::EdgeExprData)
+@inline function Base.size(e_dat::EdgeStaticData)
     (e_dat.len, )
 end
 
@@ -338,15 +265,15 @@ end
 @inline function Base.eltype(e_dat::EdgeData{G, T}) where {G, T}
     eltype(T)
 end
-@inline function Base.eltype(e_dat::EdgeExprData{G, T}) where {G, T}
+@inline function Base.eltype(e_dat::EdgeStaticData{G, T}) where {G, T}
     eltype(T)
 end
 
 Base.IndexStyle(::Type{<:EdgeData}) = IndexLinear()
-Base.IndexStyle(::Type{<:EdgeExprData}) = IndexLinear()
+Base.IndexStyle(::Type{<:EdgeStaticData}) = IndexLinear()
 
-@inline Base.dataids(e_dat::EdgeData) = dataids(e_dat.gd.e_array)
-@inline Base.dataids(e_dat::EdgeExprData) = dataids(e_dat.gd.expr_array)
+@inline Base.dataids(e_dat::EdgeData) = dataids(e_dat.gd.ed_array)
+@inline Base.dataids(e_dat::EdgeStaticData) = dataids(e_dat.gd.eS_array)
 
 struct VertexData{G, T} <: AbstractArray{T, 1}
     gd::G
@@ -381,7 +308,7 @@ Base.IndexStyle(::Type{<:VertexData}) = IndexLinear()
 
 # Putting the above together we create a GraphData object:
 
-# An alternative design that needs to be evaluated for performance is to create
+# An alternative deeSn that needs to be evaluated for performance is to create
 # only one array of VertexData and EdgeData and index into that, possibly with a
 # new set of access types...
 
@@ -389,51 +316,51 @@ Base.IndexStyle(::Type{<:VertexData}) = IndexLinear()
 # there are situations with autodifferentiation that require one of them to be
 # dual and the other not.
 
-mutable struct GraphData{Tv, Te, Tx}
+mutable struct GraphData{Tv<:Real, Ted<:Real, Tes<:Real}
     v_array::Tv
-    e_array::Te
-    expr_array::Tx
-    v::Array{VertexData{GraphData{Tv, Te, Tx}, Tv}, 1}
-    e::Array{EdgeData{GraphData{Tv, Te, Tx}, Te}, 1}
-    expr::Array{EdgeExprData{GraphData{Tv, Te, Tx}, Tx}, 1}
-    v_s_e::Array{VertexData{GraphData{Tv, Te, Tx}, Tv}, 1} # the vertex that is the source of e
-    v_d_e::Array{VertexData{GraphData{Tv, Te, Tx}, Tv}, 1} # the vertex that is the destination of e
-    e_s_v::Array{Array{EdgeData{GraphData{Tv, Te, Tx}, Te}, 1}, 1} # the edges that have v as source
-    e_d_v::Array{Array{EdgeData{GraphData{Tv, Te, Tx}, Te}, 1}, 1} # the edges that have v as destination
+    ed_array::Ted # dyanmic edge components (ODE, etc)
+    eS_array::Tes # Static edge components 
+    v::Array{VertexData{GraphData{Tv, Ted, Tes}, Tv}, 1}
+    ed::Array{EdgeData{GraphData{Tv, Ted, Tes}, Ted}, 1}
+    eS::Array{EdgeStaticData{GraphData{Tv, Ted, Tes}, Tes}, 1}
+    v_s_e::Array{VertexData{GraphData{Tv, Ted, Tes}, Tv}, 1} # the vertex that is the source of e
+    v_d_e::Array{VertexData{GraphData{Tv, Ted, Tes}, Tv}, 1} # the vertex that is the destination of e
+    ed_s_v::Array{Array{EdgeData{GraphData{Tv, Ted, Tes}, Ted}, 1}, 1} # the dynamic edges that have v as source
+    ed_d_v::Array{Array{EdgeData{GraphData{Tv, Ted, Tes}, Ted}, 1}, 1} # the dynamic edges that have v as destination
     
-    expr_s_v::Array{Array{EdgeExprData{GraphData{Tv, Te, Tx}, Tx}, 1}, 1} # the expr that have v as source
-    expr_d_v::Array{Array{EdgeExprData{GraphData{Tv, Te, Tx}, Tx}, 1}, 1} # the expr that have v as destination
+    eS_s_v::Array{Array{EdgeStaticData{GraphData{Tv, Ted, Tes}, Tes}, 1}, 1} # the eS that have v as source
+    eS_d_v::Array{Array{EdgeStaticData{GraphData{Tv, Ted, Tes}, Tes}, 1}, 1} # the eS that have v as destination
     
-    function GraphData{Tv, Te, Tx}(v_array::Tv, e_array::Te, expr_array::Tx, gs::GraphStruct) where {Tv, Te, Tx}
-        gd = new{Tv, Te, Tx}(v_array, e_array, expr_array,)
-        gd.v = [VertexData{GraphData{Tv, Te, Tx}, Tv}(gd, offset, dim) for 
+    function GraphData{Tv, Ted, Tes}(v_array::Tv, ed_array::Ted, eS_array::Tes, gs::GraphStruct) where {Tv, Ted, Tes}
+        gd = new{Tv, Ted, Tes}(v_array, ed_array, eS_array,)
+        gd.v = [VertexData{GraphData{Tv, Ted, Tes}, Tv}(gd, offset, dim) for 
                 (offset,dim) in zip(gs.v_offs, gs.v_dims)]
-        gd.e = [EdgeData{GraphData{Tv, Te, Tx}, Te}(gd, offset, dim) for 
-                (offset,dim) in zip(gs.e_offs, gs.e_dims)]
-        gd.expr = [EdgeExprData{GraphData{Tv, Te, Tx}, Tx}(gd, offset, dim) for 
-                (offset,dim) in zip(gs.expr_offs, gs.expr_dims)]
-        gd.v_s_e = [VertexData{GraphData{Tv, Te, Tx}, Tv}(gd, offset, dim) for
-                    (offset,dim) in zip(gs.s_e_offs, gs.v_dims[gs.s_e])]
-        gd.v_d_e = [VertexData{GraphData{Tv, Te, Tx}, Tv}(gd, offset, dim) for
-                    (offset,dim) in zip(gs.d_e_offs, gs.v_dims[gs.d_e])]
-        gd.e_s_v = [[EdgeData{GraphData{Tv, Te, Tx}, Te}(gd, offset, dim) for
-                     (offset,dim) in e_s_v] for e_s_v in gs.e_s_v_dat]
-        gd.e_d_v = [[EdgeData{GraphData{Tv, Te, Tx}, Te}(gd, offset, dim) for 
-                     (offset,dim) in e_d_v] for e_d_v in gs.e_d_v_dat]
-        gd.expr_s_v = [[EdgeExprData{GraphData{Tv, Te, Tx}, Tx}(gd, offset, dim) for
-                     (offset,dim) in expr_s_v] for expr_s_v in gs.expr_s_v_dat]
-        gd.expr_d_v = [[EdgeExprData{GraphData{Tv, Te, Tx}, Tx}(gd, offset, dim) for 
-                     (offset,dim) in expr_d_v] for expr_d_v in gs.expr_d_v_dat]
+        gd.ed = [EdgeData{GraphData{Tv, Ted, Tes}, Ted}(gd, offset, dim) for 
+                (offset,dim) in zip(gs.ed_offs, gs.ed_dims)]
+        gd.eS = [EdgeStaticData{GraphData{Tv, Ted, Tes}, Tes}(gd, offset, dim) for 
+                (offset,dim) in zip(gs.eS_offs, gs.eS_dims)]
+        gd.v_s_e = [VertexData{GraphData{Tv, Ted, Tes}, Tv}(gd, offset, dim) for
+                    (offset,dim) in zip(gs.s_ed_offs, gs.v_dims[gs.s_e])]
+        gd.v_d_e = [VertexData{GraphData{Tv, Ted, Tes}, Tv}(gd, offset, dim) for
+                    (offset,dim) in zip(gs.d_ed_offs, gs.v_dims[gs.d_e])]
+        gd.ed_s_v = [[EdgeData{GraphData{Tv, Ted, Tes}, Ted}(gd, offset, dim) for
+                     (offset,dim) in ed_s_v] for ed_s_v in gs.ed_s_v_dat]
+        gd.ed_d_v = [[EdgeData{GraphData{Tv, Ted, Tes}, Ted}(gd, offset, dim) for 
+                     (offset,dim) in ed_d_v] for ed_d_v in gs.ed_d_v_dat]
+        gd.eS_s_v = [[EdgeStaticData{GraphData{Tv, Ted, Tes}, Tes}(gd, offset, dim) for
+                     (offset,dim) in eS_s_v] for eS_s_v in gs.eS_s_v_dat]
+        gd.eS_d_v = [[EdgeStaticData{GraphData{Tv, Ted, Tes}, Tes}(gd, offset, dim) for 
+                     (offset,dim) in eS_d_v] for eS_d_v in gs.eS_d_v_dat]
         gd
     end
 end
 
-function GraphData(v_array, e_array, gs)
-    GraphData{typeof(v_array), typeof(e_array), nothing}(v_array, e_array, nothing, gs)
+function GraphData(v_array, ed_array, gs)
+    GraphData{typeof(v_array), typeof(ed_array), nothing}(v_array, ed_array, nothing, gs)
 end
 
-function GraphData(v_array, e_array, expr_array, gs)
-    GraphData{typeof(v_array), typeof(e_array), typeof(expr_array)}(v_array, e_array, expr_array, gs)
+function GraphData(v_array, ed_array, eS_array, gs)
+    GraphData{typeof(v_array), typeof(ed_array), typeof(eS_array)}(v_array, ed_array, eS_array, gs)
 end
 
 
@@ -449,8 +376,8 @@ function view_v(gd::GraphData, gs::GraphStruct, sym="")
 end
 
 function view_e(gd::GraphData, gs::GraphStruct, sym="")
-    e_idx = [i for (i, s) in enumerate(gs.e_syms) if occursin(string(sym), string(s))]
-    view(gd.e_array, e_idx)
+    ed_idx = [i for (i, s) in enumerate(gs.ed_syms) if occursin(string(sym), string(s))]
+    view(gd.ed_array, ed_idx)
 end
 
 
@@ -464,8 +391,8 @@ end
 function view_e(nd, x, p, t, sym="")
     gd = nd(x, p, t, GetGD)
     gs = nd(GetGS)
-    e_idx = [i for (i, s) in enumerate(gs.e_syms) if occursin(string(sym), string(s))]
-    view(gd.e_array, e_idx)
+    ed_idx = [i for (i, s) in enumerate(gs.ed_syms) if occursin(string(sym), string(s))]
+    view(gd.ed_array, ed_idx)
 end
 
 
@@ -484,20 +411,20 @@ function construct_mass_matrix(mmv_array, gs)
     mass_matrix
 end
 
-function construct_mass_matrix(mmv_array, mme_array, gs)
-    if all([mm == I for mm in mmv_array]) && all([mm == I for mm in mme_array])
+function construct_mass_matrix(mmv_array, mmed_array, gs)
+    if all([mm == I for mm in mmv_array]) && all([mm == I for mm in mmed_array])
         mass_matrix = I
     else
-        dim_nd = gs.dim_v + gs.dim_e
+        dim_nd = gs.dim_v + gs.dim_ed
         mass_matrix = sparse(1.0I,dim_nd,dim_nd)
         for (i, mm) in enumerate(mmv_array)
             if mm != I
                 mass_matrix[gs.v_idx[i],gs.v_idx[i]] .= mm
             end
         end
-        for (i, mm) in enumerate(mme_array)
+        for (i, mm) in enumerate(mmed_array)
             if mm != I
-                mass_matrix[gs.e_idx[i] .+ gs.dim_v, gs.e_idx[i] .+ gs.dim_v] .= mm
+                mass_matrix[gs.ed_idx[i] .+ gs.dim_v, gs.ed_idx[i] .+ gs.dim_v] .= mm
             end
         end
     end

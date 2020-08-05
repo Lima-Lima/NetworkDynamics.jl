@@ -17,8 +17,8 @@ end
 
 @inline function prep_gd(dx, x, gd, gs)
     # Type mismatch
-    e_array = similar(dx, gs.dim_e)
-    GraphData(x, e_array, gs)
+    eS_array = similar(dx, gs.dim_e)
+    GraphData(x, eS_array, gs)
 end
 
 
@@ -37,11 +37,12 @@ function (d::nd_ODE_Static)(dx, x, p, t)
     gd = prep_gd(dx, x, d.graph_data, d.graph_structure)
 
     @nd_threads d.parallel for i in 1:d.graph_structure.num_e
-        maybe_idx(d.edges!, i).f!(gd.e[i], gd.v_s_e[i], gd.v_d_e[i], p_e_idx(p, i), t)
-    end
+        maybe_idx(d.edges!, i).f!(gd.eS[i], gd.v_s_eS[i], gd.v_d_eS[i], p_eS_idx(p, i), t)
+    end # TODO: Should the static edge have the same signature as the dyanmic edges (number of argument)
+        # despite not requiring it?
 
     @nd_threads d.parallel for i in 1:d.graph_structure.num_v
-        maybe_idx(d.vertices!,i).f!(view(dx,d.graph_structure.v_idx[i]), gd.v[i], gd.e_s_v[i], gd.e_d_v[i], p_v_idx(p, i), t)
+        maybe_idx(d.vertices!,i).f!(view(dx,d.graph_structure.v_idx[i]), gd.v[i], gd.eS_s_v[i], gd.eS_d_v[i], p_v_idx(p, i), t)
     end
 
     nothing
@@ -53,7 +54,7 @@ function (d::nd_ODE_Static)(x, p, t, ::Type{GetGD})
 
 
     @nd_threads d.parallel for i in 1:d.graph_structure.num_e
-        maybe_idx(d.edges!,i).f!(gd.e[i], gd.v_s_e[i], gd.v_d_e[i], p_e_idx(p, i), t)
+        maybe_idx(d.edges!,i).f!(gd.eS[i], gd.v_s_eS[i], gd.v_d_eS[i], p_eS_idx(p, i), t)
     end
 
     gd
@@ -74,7 +75,7 @@ end
 function (sef::StaticEdgeFunction)(x, p, t)
     gd = sef.nd_ODE_Static(x, p, t, GetGD)
 
-    (gd.e_s_v, gd.e_d_v)
+    (gd.eS_s_v, gd.eS_d_v)
 end
 
 end #module

@@ -4,7 +4,6 @@ using ..NetworkStructures
 using ..NDFunctions
 using ..Utilities
 export nd_ODE_ODE
-using Debugger
 #= The arguments of the vertex functions must be of the form (dv,v,e_s,e_d,p,t),
 where dv is the vertex variable derivative, v the vertex variable and e_s and e_d Arrays of edge variables that
 have the vertex as source and destination respectively. p and t are as usual.
@@ -19,14 +18,14 @@ need to fit, i.e. don't do something like edges! = v_s - v_d when v_s and v_d ha
 @inline function prep_gd(dy::T, y::T, x, gd::GraphData{T, T}, gs) where T
     # println("Type match")
     gd.v_array = view(x, 1:gs.dim_v)
-    gd.e_array = view(x, gs.dim_v+1:gs.dim_v+gs.dim_e)
+    gd.ed_array = view(x, gs.dim_v+1:gs.dim_v+gs.dim_ed)
     gd
 end
 
 @inline function prep_gd(dy, y, x, gd, gs)
     # println("Type mismatch")
     v_array = view(x, 1:gs.dim_v)
-    e_array = view(x, gs.dim_v+1:gs.dim_v+gs.dim_e)
+    ed_array = view(x, gs.dim_v+1:gs.dim_v+gs.dim_ed)
     gd 
     #GraphData(v_array, e_array, gs)
 end
@@ -45,20 +44,19 @@ function (d::nd_ODE_ODE)(dx, x, p, t)
     gd = prep_gd(view(dx, 1:2), view(x, 1:2), x, d.graph_data, d.graph_structure)
     @nd_threads d.parallel for i in 1:d.graph_structure.num_e
             maybe_idx(d.edges!, i).f!(
-                view(dx,d.graph_structure.e_idx[i] .+ d.graph_structure.dim_v), 
-                gd.e[i],
-                gd.expr[i],
-                gd.v_s_e[i], gd.v_d_e[i],
+                view(dx,d.graph_structure.ed_idx[i] .+ d.graph_structure.dim_v), 
+                gd.ed[i], # Dynamic (differential) edge states
+                gd.eS[i], # Static (explicit) edge states
+                gd.v_s_e[i], gd.v_d_e[i], # Source and destination vertex of the edge
                 p_e_idx(p, i),
                 t)
     
         end
-    @bp
     @nd_threads d.parallel for i in 1:d.graph_structure.num_v
             maybe_idx(d.vertices!,i).f!(view(dx,d.graph_structure.v_idx[i]),
                                         gd.v[i], 
-                                        gd.expr_s_v[i], 
-                                        gd.expr_d_v[i],
+                                        gd.eS_s_v[i], 
+                                        gd.eS_d_v[i],
                                         p_v_idx(p, i), 
                                         t)
         end

@@ -82,10 +82,8 @@ For more details see the documentation.
 """
 @Base.kwdef struct StaticEdge{T} <: EdgeFunction
     f!::T # (e, v_s, v_t, p, t) -> nothing
-    dim::Int # number of dimensions of x
-    expr_dim::Int # number of dimensions of x
-    sym=[:e for i in 1:dim] # Symbols for the dimensions
-    expr_sym=[:ex for i in 1:dim] # Symbols for the dimensions
+    eS_dim::Int # number of dimensions of x
+    eS_sym=[:ex for i in 1:dim] # Symbols for the dimensions
 end
 
 """
@@ -148,11 +146,11 @@ For more details see the documentation.
 """
 @Base.kwdef struct ODEEdge{T} <: EdgeFunction
     f!::T # The function with signature (dx, x, e_s, e_t, p, t) -> nothing
-    dim::Int # number of dimensions of x
-    expr_dim::Int # number of non-dynamic dimensions of x
+    ed_dim::Int # number of dimensions of x
+    eS_dim::Int # number of non-dynamic dimensions of x
     mass_matrix=I # Mass matrix for the equation
-    sym=[:e for i in 1:dim] # Symbols for the dimensions
-    expr_sym=[:ex for i in 1:dim] # Symbols for the dimensions
+    ed_sym=[:e for i in 1:dim] # Symbols for the dimensions
+    eS_sym=[:ex for i in 1:dim] # Symbols for the dimensions
 end
 
 
@@ -182,10 +180,12 @@ solved.
 For more details see the documentation.
 """
 @Base.kwdef struct DDEVertex{T} <: VertexFunction
-    f!::T # The function with signature (dx, x, e_s, e_t, h, p, t) -> nothing
-    dim::Int # number of dimensions of x
+    f!::T # The function with signature (dx, x, e_s, e_t, p, t) -> nothing
+    ed_dim::Int # number of dimensions of x
+    eS_dim::Int # number of non-dynamic dimensions of x
     mass_matrix=I # Mass matrix for the equation
-    sym=[:v for i in 1:dim] # Symbols for the dimensions
+    ed_sym=[:e for i in 1:dim] # Symbols for the dimensions
+    eS_sym=[:ex for i in 1:dim] # Symbols for the dimensions
 end
 
 function DDEVertex(ov::ODEVertex)
@@ -212,9 +212,9 @@ promote_rule(::Type{DDEVertex}, ::Type{ODEVertex}) = DDEVertex
 Like a static edge but with extra arguments for the history of the source and destination vertices. This is NOT a DDEEdge.
 """
  @Base.kwdef struct StaticDelayEdge{T} <: EdgeFunction
-    f!::T # (e, v_s, v_t, p, t) -> nothing
-    dim::Int # number of dimensions of x
-    sym=[:e for i in 1:dim] # Symbols for the dimensions
+    f!::T # The function with signature (dx, x, e_s, e_t, p, t) -> nothing
+    eS_dim::Int # number of non-dynamic dimensions of x
+    eS_sym=[:ex for i in 1:dim] # Symbols for the dimensions
 end
 
 function StaticDelayEdge(se::StaticEdge)

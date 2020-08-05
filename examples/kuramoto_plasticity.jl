@@ -14,24 +14,22 @@ g = barabasi_albert(N, k)
 =#
 
 
-@inline function kuramoto_plastic_edge!(de, e, ex, v_s, v_d, p, t)
-    # Source to Destination coupling
+@inline function kuramoto_plastic_edge!(ded, ed, eS, v_s, v_d, p, t)
 
     ϵ = 0.1
     α = .2π
     β = -.95π
 
-    # The coupling function is modeled by a differential algebraic equation with mass matrix 0
-    # 0 * de[1] = e[2] * sin(v_s[1] - v_d[1] + α) / N - e[1] is equivalent to e[1] = e[2] * sin(v_s[1] - v_d[1] + α) / N
 
-    ex[1] =  e[1] * sin(v_s[1] - v_d[1] + α) / N  # Not updating the dynamic state vector
-    de[1] = - ϵ * (sin(v_s[1] - v_d[1] + β) + e[1]) # Updating the dynamics state vector
+    # Source to Destination coupling
+    eS[1] =  ed[1] * sin(v_s[1] - v_d[1] + α) / N  # Not updating the dynamic state vector
+    ded[1] = - ϵ * (sin(v_s[1] - v_d[1] + β) + ed[1]) # Updating the dynamic state vector
 
     # Destination to source coupling
     # since the coupling function is not symmetric we have to compute the other direction as well
 
-    ex[2] =  e[2] * sin(v_d[1] - v_s[1] + α) / N
-    de[2] = - ϵ * (sin(v_d[1] - v_s[1] + β) + e[2])
+    eS[2] =  ed[2] * sin(v_d[1] - v_s[1] + α) / N
+    ded[2] = - ϵ * (sin(v_d[1] - v_s[1] + β) + ed[2])
     nothing
 end
 
@@ -50,7 +48,7 @@ function run()
 # NetworkDynamics Setup
 plasticvertex = ODEVertex(f! = kuramoto_plastic_vertex!, dim =1)
 
-plasticedge = ODEEdge(f! = kuramoto_plastic_edge!, dim=2, expr_dim=2, sym=[:ks,:kd], expr_sym=[:es,:ed])
+plasticedge = ODEEdge(f! = kuramoto_plastic_edge!, ed_dim=2, eS_dim=2, ed_sym=[:ks,:kd], eS_sym=[:es,:ed])
 kuramoto_plastic! = network_dynamics(plasticvertex, plasticedge, g)
 
 # ODE Setup & Solution

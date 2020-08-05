@@ -50,20 +50,20 @@ function collect_ve_info(vertices!, edges!, graph)
 
     if edges! isa Array
         @assert length(edges!) == ne(graph)
-        e_dims = [e.dim for e in edges!]
-        expr_dims = [e.expr_dim for e in edges!]
-        symbols_e = [Symbol(edges![i].sym[j],"_",i) for i in 1:length(edges!) for j in 1:e_dims[i]]
-        symbols_expr = [Symbol(edges![i].expr_sym[j],"_",i) for i in 1:length(edges!) for j in 1:expr_dims[i]]
+        ed_dims = [e.dim for e in edges!]
+        eS_dims = [e.eS_dim for e in edges!]
+        symbols_ed = [Symbol(edges![i].sym[j],"_",i) for i in 1:length(edges!) for j in 1:ed_dims[i]]
+        symbols_eS = [Symbol(edges![i].eS_sym[j],"_",i) for i in 1:length(edges!) for j in 1:eS_dims[i]]
         if eltype(edges!)  <: Union{StaticEdge, StaticDelayEdge}  # improve type hierarchy
             mme_array = nothing
         else
             mme_array = [e.mass_matrix for e in edges!]
         end
     else
-        e_dims = [edges!.dim for e in edges(graph)]
-        expr_dims = [edges!.expr_dim for e in edges(graph)]
-        symbols_e = [Symbol(edges!.sym[j],"_",i) for i in 1:ne(graph) for j in 1:e_dims[i]]
-        symbols_expr = [Symbol(edges!.expr_sym[j],"_",i) for i in 1:ne(graph) for j in 1:e_dims[i]]
+        ed_dims = [edges!.ed_dim for e in edges(graph)]
+        eS_dims = [edges!.eS_dim for e in edges(graph)]
+        symbols_ed = [Symbol(edges!.ed_sym[j],"_",i) for i in 1:ne(graph) for j in 1:ed_dims[i]]
+        symbols_eS = [Symbol(edges!.eS_sym[j],"_",i) for i in 1:ne(graph) for j in 1:ed_dims[i]]
         if typeof(edges!) <: Union{StaticEdge, StaticDelayEdge} # improve type hierarchy
             mme_array = nothing
         else
@@ -71,7 +71,7 @@ function collect_ve_info(vertices!, edges!, graph)
         end
     end
 
-    v_dims, e_dims, expr_dims, symbols_v, symbols_e, symbols_expr, mmv_array, mme_array
+    v_dims, ed_dims, eS_dims, symbols_v, symbols_ed, symbols_eS, mmv_array, mme_array
 end
 
 """
@@ -93,15 +93,15 @@ function network_dynamics(vertices!::Union{Array{T, 1}, T}, edges!::Union{Array{
         "variable JULIA_NUM_THREADS set to the number of physical cores of your CPU.")
     end
 
-    v_dims, e_dims, expr_dims, symbols_v, symbols_e, symbols_expr, mmv_array, mme_array = collect_ve_info(vertices!, edges!, graph)
+    v_dims, ed_dims, eS_dims, symbols_v, symbols_ed, symbols_eS, mmv_array, mme_array = collect_ve_info(vertices!, edges!, graph)
 
     # These arrays are used for initializing the GraphData and will be overwritten
     v_array = similar(x_prototype, sum(v_dims))
-    e_array = similar(x_prototype, sum(e_dims))
+    e_array = similar(x_prototype, sum(ed_dims))
 
     symbols = symbols_v
 
-    graph_stucture = GraphStruct(graph, v_dims, e_dims, symbols_v, symbols_e)
+    graph_stucture = GraphStruct(graph, v_dims, ed_dims, symbols_v, symbols_ed)
 
     graph_data = GraphData(v_array, e_array,  graph_stucture)
 
@@ -122,11 +122,11 @@ function network_dynamics(vertices!::Union{Array{T, 1}, T}, edges!::Union{Array{
         "variable JULIA_NUM_THREADS set to the number of physical cores of your CPU.")
     end
 
-    v_dims, e_dims, expr_dims, symbols_v, symbols_e, symbols_expr, mmv_array, mme_array = collect_ve_info(vertices!, edges!, graph)
+    v_dims, ed_dims, eS_dims, symbols_v, symbols_ed, symbols_eS, mmv_array, mme_array = collect_ve_info(vertices!, edges!, graph)
 
     # These arrays are used for initializing the GraphData and will be overwritten
     v_array = similar(x_prototype, sum(v_dims))
-    e_array = similar(x_prototype, sum(e_dims))
+    e_array = similar(x_prototype, sum(ed_dims))
 
     # default
     if initial_history == nothing
@@ -135,7 +135,7 @@ function network_dynamics(vertices!::Union{Array{T, 1}, T}, edges!::Union{Array{
 
     symbols = symbols_v
 
-    graph_stucture = GraphStruct(graph, v_dims, e_dims, symbols_v, symbols_e)
+    graph_stucture = GraphStruct(graph, v_dims, ed_dims, symbols_v, symbols_ed)
 
     graph_data = GraphData(v_array, e_array, graph_stucture)
 
@@ -177,19 +177,19 @@ function network_dynamics(vertices!::Union{Array{T, 1}, T}, edges!::Union{Array{
         "variable JULIA_NUM_THREADS set to the number of physical cores of your CPU.")
     end
 
-    v_dims, e_dims, expr_dims, symbols_v, symbols_e, symbols_expr, mmv_array, mme_array = collect_ve_info(vertices!, edges!, graph)
+    v_dims, ed_dims, eS_dims, symbols_v, symbols_ed, symbols_eS, mmv_array, mme_array = collect_ve_info(vertices!, edges!, graph)
 
     # These arrays are used for initializing the GraphData and will be overwritten
-    x_array = similar(x_prototype, sum(v_dims) + sum(e_dims))
+    x_array = similar(x_prototype, sum(v_dims) + sum(ed_dims))
     v_array = view(x_array, 1:sum(v_dims))
-    e_array = view(x_array, sum(v_dims)+1:sum(v_dims)+sum(e_dims))
-    expr_array = similar(x_prototype, sum(expr_dims))
+    e_array = view(x_array, sum(v_dims)+1:sum(v_dims)+sum(ed_dims))
+    eS_array = similar(x_prototype, sum(eS_dims))
 
-    symbols = vcat(symbols_v, symbols_e)
+    symbols = vcat(symbols_v, symbols_ed)
 
-    graph_stucture = GraphStruct(graph, v_dims, e_dims, expr_dims, symbols_v, symbols_e, symbols_expr)
+    graph_stucture = GraphStruct(graph, v_dims, ed_dims, eS_dims, symbols_v, symbols_ed, symbols_eS)
 
-    graph_data = GraphData(v_array, e_array, expr_array, graph_stucture)
+    graph_data = GraphData(v_array, e_array, eS_array, graph_stucture)
 
     nd! = nd_ODE_ODE(vertices!, edges!, graph, graph_stucture, graph_data, parallel)
 
