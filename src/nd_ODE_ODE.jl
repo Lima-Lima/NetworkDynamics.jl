@@ -1,7 +1,7 @@
 module nd_ODE_ODE_mod
 
 using ..NetworkStructures
-using ..NDFunctions
+using ..ComponentFunctions
 using ..Utilities
 export nd_ODE_ODE
 #= The arguments of the vertex functions must be of the form (dv,v,e_s,e_d,p,t),
@@ -11,6 +11,8 @@ The arguments of the edge functions must be of the form (de,e,v_s,v_d,p,t),
 where de is the derivative of the edge variable, e the edge variable, v_s and v_d the vertex variables of the vertices
 the edge has as source and destination respectively. This works for arbitrary dimensional vertex and edge functions, they only
 need to fit, i.e. don't do something like edges! = v_s - v_d when v_s and v_d have not the same dimension. =#
+
+The signature of the edge functions is expected to be (de,e,v_s,v_d,p,t). =#
 
 
 # In order to match the type, we need to pass both, a view that matches the type

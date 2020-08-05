@@ -1,5 +1,3 @@
-"""network_dynamics: The Main Constructor of the Package. It takes Arrays of Vertex- and Edgefunction + a graph and
-spits out an ODEFunction. Others still need to be implemented. """
 module NetworkDynamics
 
 using Reexport
@@ -9,8 +7,8 @@ using LightGraphs
 include("Utilities.jl")
 @reexport using .Utilities
 
-include("Functions.jl")
-@reexport using .NDFunctions
+include("ComponentFunctions.jl")
+@reexport using .ComponentFunctions
 
 include("NetworkStructures.jl")
 @reexport using .NetworkStructures
@@ -24,7 +22,6 @@ include("nd_ODE_Static.jl")
 include("nd_DDE_Static.jl")
 @reexport using .nd_DDE_Static_mod
 
-include("SimpleAPI.jl")
 
 export network_dynamics
 
@@ -81,7 +78,7 @@ Assembles the the dynamical equations of the network problem into an `ODEFunctio
 compatible with the `DifferentialEquations.jl` solvers. Takes as arguments an array
 of VertexFunctions **`vertices!`**, an array of EdgeFunctions **`edges!`** and a
 `LightGraph.jl` object **`g`**. The optional argument `parallel` is a boolean
-value that denotes if the central loop should be executed in parallel with the number of threads set by the environment variable JULIA_NUM_THREADS.
+value that denotes if the central loop should be executed in parallel with the number of threads set by the environment variable `JULIA_NUM_THREADS`.
 """
 function network_dynamics(vertices!::Union{Array{T, 1}, T}, edges!::Union{Array{U, 1}, U},
                           graph; x_prototype=zeros(1), parallel=false) where {T <: ODEVertex, U <: StaticEdge}
@@ -199,6 +196,15 @@ function network_dynamics(vertices!::Union{Array{T, 1}, T}, edges!::Union{Array{
 end
 
 function network_dynamics(vertices!,  edges!, graph; parallel=false)
+    # If vertices! and/or edges! are individual functions and no other dispatch was
+    # triggered, assume all vertices, respectively edges will be of that type
+    if typeof(vertices!) <: VertexFunction
+        vertices! = Array{VertexFunction}([vertices! for i in 1:nv(graph)])
+    end
+    if typeof(edges!) <: EdgeFunction
+        edges! = Array{EdgeFunction}([edges! for i in 1:ne(graph)])
+    end
+
     try
         Array{VertexFunction}(vertices!)
     catch err
@@ -206,6 +212,7 @@ function network_dynamics(vertices!,  edges!, graph; parallel=false)
         println(err)
         return nothing
     end
+
     try
         Array{EdgeFunction}(edges!)
     catch err
