@@ -18,6 +18,7 @@ export StaticVertex
 export StaticEdge
 export ODEVertex
 export ODEEdge
+export ODEEAEdge
 export DDEVertex
 export StaticDelayEdge
 #export DDEEdge
@@ -80,10 +81,10 @@ the source and destination of the described edge.
 
 For more details see the documentation.
 """
-@Base.kwdef struct StaticEdge{T} <: EdgeFunction
-    f!::T # (e, v_s, v_t, p, t) -> nothing
-    eS_dim::Int # number of dimensions of x
-    eS_sym=[:ex for i in 1:dim] # Symbols for the dimensions
+# The StaticEdge function returns an ODEEAEdge
+function StaticEdge{T}(f!::T,dim::Int;sym=[:e for i in 1:dim])
+    fea! = (ded,ed,eS,v_s,v_d,p,t) -> f!(ded,ed,v_s,v_d,p,t)
+    return ODEEAEdge(fea!,ed_dim=0,eS_dim=dim,eS_sym=sym)
 end
 
 """
@@ -117,7 +118,29 @@ For more details see the documentation.
     mass_matrix=I # Mass matrix for the equation
     sym=[:v for i in 1:dim] # Symbols for the dimensions
 end
+"""
+    ODEEAVertex(f!, dim, mass_matrix, sym)
 
+    and f! must be
+    
+    `f!(dv,v,e_s_v,e_d_v,eS_s_v,eS_d_v,p,t)`
+    with differential vertex states `dv` and `v`, 
+    `ed_s_v` differential edge states source
+    `ed_d_v` differential edge states dest
+    `eS_s_v` explicit edge states source
+    `eS_d_v` explicit edge states dest
+    `p` params
+    `t` time
+
+"""
+@Base.kwdef struct ODEEAVertex{T} <: VertexFunction
+    f!::T # The function (dx,x,v,eS_s_v,eS_d,v,p,t) 
+    dim::Int # number of dimensions of x
+    mass_matrix=I # Mass matrix for the equation
+    sym=[:v for i in 1:dim] # Symbols for the dimensions
+end
+
+#TODO: Pick up here
 """
     ODEEdge(f!, dim, mass_matrix, sym)
 
@@ -144,14 +167,51 @@ solved.
 
 For more details see the documentation.
 """
-@Base.kwdef struct ODEEdge{T} <: EdgeFunction
+# The ODEEdge contructor creates an ODEEAEdge
+function ODEEdge{T}(f!::T,dim::Int;mass_matrix=I,sym=[:e for i in 1:ed_dim])
+    fea! = (ded,ed,eS,v_s,v_d,p,t) -> f!(ded,ed,v_s,v_d,p,t)
+    return ODEEAEdge(fea!,
+                     ed_dim=dim,
+                     eS_dim=0,
+                     mass_matrix=mass_matrix,
+                     ed_sym=sym)
+end
+
+"""
+    ODEEAEdge(f!, dyn_dim, ex_dim, mass_matrix, dyn_sym, ex_sym)
+
+This is an ODE edge that also contains an explicit algebraic equation. 
+
+Inputs are 
+    `f!` rhs function (described below)
+    `dyn_dim` dynamic dimension of the edge
+    `ex_dim` explicit algebraic dimension of the edge
+    `mass_matrix` mass matrix elements for the dynamic portion
+    `dyn_sym` symbols associated with `dyn_dim`s
+    `ex_sym` symbols associated with  `ex_dim`s. 
+
+**f!** describes the dynamics behavior of the function,  both with explicit algebraic and differential states. 
+
+```julia
+f!(ded,ed,eS,v_s,v_d,p,t) -> nothing
+```
+with `ded` edge' differential array (output)
+     `ed` edge differential array (input)
+     `eS` edge explicit algebraic static terms (output)
+     `v_s`, `v_d` the source and destination of the edge
+     `p` parameters
+     `t` time
+
+"""
+@Base.kwdef struct ODEEAEdge{T} <: EdgeFunction
     f!::T # The function with signature (dx, x, e_s, e_t, p, t) -> nothing
     ed_dim::Int # number of dimensions of x
     eS_dim::Int # number of non-dynamic dimensions of x
     mass_matrix=I # Mass matrix for the equation
-    ed_sym=[:e for i in 1:dim] # Symbols for the dimensions
-    eS_sym=[:ex for i in 1:dim] # Symbols for the dimensions
+    ed_sym=[:e for i in 1:ed_dim] # Symbols for the dimensions
+    eS_sym=[:e for i in 1:eS_dim] # Symbols for the dimensions
 end
+
 
 
 """
@@ -221,36 +281,32 @@ Like a static edge but with extra arguments for the history of the source and de
     eS_sym=[:ex for i in 1:dim] # Symbols for the dimensions
 end
 
-function StaticDelayEdge(se::StaticEdge)
-    f! = (e, v_s, v_d, h_v_s, h_v_d, p, t) -> se.f!(e, v_s, v_d, p, t)
+function StaticDelayEdge(se::ODEEAEdge)
+    @assert(se.ed_dim=0) # for now, this can't have differential terms.
+    f! = (e, v_s, v_d, h_v_s, h_v_d, p, t) -> se.f!(
+                                ded=nothing,
+                                ed=nothing, 
+                                eS=e,
+                                v_s=v_s, 
+                                v_d=v_d, 
+                                p=p, 
+                                t=t)
     StaticDelayEdge(f!, se.dim, se.sym)
+    # TODO: This approach makes a lot of small structs,
+    # as each StaticEdge that gets promoted now exists as a StaticEdge
+    # and a StaticDelayEdge. In a large system of mostly static edges,
+    # this is not insignificant as they all get doubled. A better style
+    # should be realizable.
+    #
+    # TODO: This could also be a delay ODE/EA edge, with ded!= nothing.
+    # That resolves the assert at the start of this function.
 end
+# Return a ODEEAEdge
 
 # Promotion rules
 
-convert(::Type{StaticDelayEdge}, x::StaticEdge) = StaticDelayEdge(x)
-promote_rule(::Type{StaticDelayEdge}, ::Type{StaticEdge}) = StaticDelayEdge
-
-
-#= not used at the moment
-"""
-Like a ODEEdge but with extra arguments for the history of the source and destination vertices. This is NOT a DDEEdge.
-"""
-@Base.kwdef struct ODEDelayEdge{T} <: EdgeFunction
-   f!::T # (e, v_s, v_t, p, t) -> nothing
-   dim::Int # number of dimensions of x
-   mass_matrix=I # Mass matrix for the equation
-   sym=[:e for i in 1:dim] # Symbols for the dimensions
-end
-
-function ODEDelayEdge(se::ODEEdge)
-   f! = (de, e, v_s, v_d, h_v_s, h_v_d, p, t) -> se.f!(de, e, v_s, v_d, p, t)
-   ODEDelayEdge(f!, se.dim, se.sym)
-end
-
-# promotions rules are more complicated for this case
-
-=#
+convert(::Type{StaticDelayEdge}, x::ODEEAEdge) = StaticDelayEdge(x)
+promote_rule(::Type{StaticDelayEdge}, ::Type{ODEEAEdge}) = StaticDelayEdge
 
 
 convert(::Type{ODEVertex}, x::StaticVertex) = ODEVertex(x)
@@ -259,31 +315,4 @@ promote_rule(::Type{ODEVertex}, ::Type{StaticVertex}) = ODEVertex
 # Not sure if the next line does something?
 promote_rule(::Type{ODEVertex{T}}, ::Type{ODEVertex{U}}) where {T, U} = ODEVertex
 
-convert(::Type{ODEEdge}, x::StaticEdge) = ODEEdge(x)
-promote_rule(::Type{ODEEdge}, ::Type{StaticEdge}) = ODEEdge
-"""
-Promotes a StaticVertex to an ODEVertex.
-"""
-struct ODE_from_Static{T}
-    f!::T
-end
-function (ofs::ODE_from_Static)(dx,x,args...)
-    # If mass matrix = 0 the differential equation sets dx = 0.
-    # To set x to the value calculated by f! we first write the value calculated
-    # by f! into dx, then subtract x. This leads to the  constraint
-    # 0 = - x + f(...)
-    # where f(...) denotes the value that f!(a, ...) writes into a.
-    ofs.f!(dx,args...)
-    dx .-= x
-    nothing
-end
 
-function ODEVertex(sv::StaticVertex)
-    ODEVertex(ODE_from_Static(sv.f!), sv.dim, 0., sv.sym)
-end
-
-function ODEEdge(se::StaticEdge)
-    ODEEdge(ODE_from_Static(se.f!), se.dim, 0., se.sym)
-end
-
-end

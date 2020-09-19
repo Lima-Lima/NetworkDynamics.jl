@@ -12,7 +12,7 @@ where de is the derivative of the edge variable, e the edge variable, v_s and v_
 the edge has as source and destination respectively. This works for arbitrary dimensional vertex and edge functions, they only
 need to fit, i.e. don't do something like edges! = v_s - v_d when v_s and v_d have not the same dimension. =#
 
-The signature of the edge functions is expected to be (de,e,v_s,v_d,p,t). =#
+#The signature of the edge functions is expected to be (de,e,v_s,v_d,p,t). =#
 
 
 # In order to match the type, we need to pass both, a view that matches the type

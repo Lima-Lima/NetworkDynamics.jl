@@ -64,8 +64,9 @@ struct GraphStruct
     num_v::Int
     num_e::Int
     v_dims::Array{Int, 1} # Array of dimension of each vertex
+    e_dims::Array{Int, 1} # Array of dimension of each edge as seen by v
     ed_dims::Array{Int, 1} # and edge differetinal state
-    eS_dims::Array{Int, 1} # and edge eSession
+    eS_dims::Array{Int, 1} # and edge static
     v_syms::Array{Symbol, 1} # Symbols associated with v states
     ed_syms::Array{Symbol, 1} # e states
     eS_syms::Array{Symbol, 1} # and eSession terms
@@ -90,7 +91,7 @@ struct GraphStruct
     eS_d_v_dat::Array{Array{Tuple{Int,Int}, 1}}
 end
 
-function GraphStruct(g, v_dims, ed_dims, eS_dims, v_syms, ed_syms, eS_syms)
+function GraphStruct(g, v_dims, e_dims, ed_dims, eS_dims, v_syms, ed_syms, eS_syms)
     num_v = nv(g)
     num_e = ne(g)
 
@@ -160,6 +161,7 @@ function GraphStruct(g, v_dims, ed_dims, eS_dims, v_syms, ed_syms, eS_syms)
     num_v,
     num_e,
     v_dims,
+    e_dims,
     ed_dims,
     eS_dims,
     v_syms,

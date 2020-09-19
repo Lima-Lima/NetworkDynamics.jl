@@ -47,8 +47,17 @@ function collect_ve_info(vertices!, edges!, graph)
 
     if edges! isa Array
         @assert length(edges!) == ne(graph)
-        ed_dims = [e.dim for e in edges!]
+        ed_dims = [e.ed_dim for e in edges!]
         eS_dims = [e.eS_dim for e in edges!]
+        # An edge with at least one explicit algebraic state passes EA states to
+        # the vertex, wihle an edge without any, from the perspective of the
+        # vertex, is defined by the differential states. Thus, the e_dims
+        # describes that the vertex needs to see.
+        # Store eS_dim negative as a flag that it's static, for passing to the
+        # GraphData constructor. 
+        #
+        e_dims = [e.eS_dim>0 ? -e.eS_dim : e.ed_dim for (e.ed_dim,e.eS_dim) in
+                  zip(ed_dims,eS_dims)]
         symbols_ed = [Symbol(edges![i].sym[j],"_",i) for i in 1:length(edges!) for j in 1:ed_dims[i]]
         symbols_eS = [Symbol(edges![i].eS_sym[j],"_",i) for i in 1:length(edges!) for j in 1:eS_dims[i]]
         if eltype(edges!)  <: Union{StaticEdge, StaticDelayEdge}  # improve type hierarchy
@@ -57,8 +66,9 @@ function collect_ve_info(vertices!, edges!, graph)
             mme_array = [e.mass_matrix for e in edges!]
         end
     else
-        ed_dims = [edges!.ed_dim for e in edges(graph)]
+        ed_dims = [edges!.ed_dim for e in edges(graph)] # TODO: ed_dims and eS_dims to a tuple array
         eS_dims = [edges!.eS_dim for e in edges(graph)]
+        e_dims = [e.eS_dim>0 ? -e.eS_dim : e.ed_dim for (e.ed_dim,e.eS_dim) in zip(ed_dims,eS_dims)]
         symbols_ed = [Symbol(edges!.ed_sym[j],"_",i) for i in 1:ne(graph) for j in 1:ed_dims[i]]
         symbols_eS = [Symbol(edges!.eS_sym[j],"_",i) for i in 1:ne(graph) for j in 1:ed_dims[i]]
         if typeof(edges!) <: Union{StaticEdge, StaticDelayEdge} # improve type hierarchy
@@ -68,8 +78,8 @@ function collect_ve_info(vertices!, edges!, graph)
         end
     end
 
-    v_dims, ed_dims, eS_dims, symbols_v, symbols_ed, symbols_eS, mmv_array, mme_array
-end
+    v_dims, e_dims, ed_dims, eS_dims, symbols_v, symbols_ed, symbols_eS, mmv_array, mme_array
+end # collect_ve_info
 
 """
     network_dynamics(vertices!, edges!, g; parallel = false)
@@ -79,7 +89,7 @@ compatible with the `DifferentialEquations.jl` solvers. Takes as arguments an ar
 of VertexFunctions **`vertices!`**, an array of EdgeFunctions **`edges!`** and a
 `LightGraph.jl` object **`g`**. The optional argument `parallel` is a boolean
 value that denotes if the central loop should be executed in parallel with the number of threads set by the environment variable `JULIA_NUM_THREADS`.
-"""
+""" # TODO: LSL Here I need to update the constructor such that if an edge has a explicit algebraic part that =0, then it creates a EdgeODEData object and accesses the underlying differential vector. If the explicit algebraic part is nonzero, then it accesses the algebraic state. This has to propogate into the idx and offsets. 
 function network_dynamics(vertices!::Union{Array{T, 1}, T}, edges!::Union{Array{U, 1}, U},
                           graph; x_prototype=zeros(1), parallel=false) where {T <: ODEVertex, U <: StaticEdge}
     if parallel
@@ -90,7 +100,7 @@ function network_dynamics(vertices!::Union{Array{T, 1}, T}, edges!::Union{Array{
         "variable JULIA_NUM_THREADS set to the number of physical cores of your CPU.")
     end
 
-    v_dims, ed_dims, eS_dims, symbols_v, symbols_ed, symbols_eS, mmv_array, mme_array = collect_ve_info(vertices!, edges!, graph)
+    v_dims, e_dims, ed_dims, eS_dims, symbols_v, symbols_ed, symbols_eS, mmv_array, mme_array = collect_ve_info(vertices!, edges!, graph)
 
     # These arrays are used for initializing the GraphData and will be overwritten
     v_array = similar(x_prototype, sum(v_dims))
@@ -98,7 +108,7 @@ function network_dynamics(vertices!::Union{Array{T, 1}, T}, edges!::Union{Array{
 
     symbols = symbols_v
 
-    graph_stucture = GraphStruct(graph, v_dims, ed_dims, symbols_v, symbols_ed)
+    graph_stucture = GraphStruct(graph, v_dims, e_dims, ed_dims, eS_dims, symbols_v, symbols_ed, symbols_eS)
 
     graph_data = GraphData(v_array, e_array,  graph_stucture)
 
